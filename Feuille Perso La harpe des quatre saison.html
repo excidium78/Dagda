@@ -55,7 +55,7 @@
             padding-bottom: 5px;
         }
 
-        /* STATS (PV, Dextérité, etc.) */
+        /* STATS */
         .stats-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -83,7 +83,6 @@
             width: 90%;
         }
 
-        /* BARRE DE VIE */
         .pv-container {
             grid-column: 1 / -1;
             display: flex;
@@ -91,7 +90,7 @@
             align-items: center;
         }
         
-        /* SAUVEGARDE (CHECKBOXES) */
+        /* SAUVEGARDE */
         .saves-container {
             display: flex;
             justify-content: space-around;
@@ -186,12 +185,76 @@
             transform: translateY(2px);
         }
 
+        /* SECTION EXPORT/IMPORT */
+        .sync-section {
+            background: #1a1a1a;
+            border: 2px solid #ffcc00;
+        }
+
+        .sync-buttons {
+            display: flex;
+            gap: 15px;
+            justify-content: center;
+            margin-top: 15px;
+        }
+
+        .export-btn {
+            background: linear-gradient(#1a73e8, #0d47a1);
+        }
+
+        .import-btn {
+            background: linear-gradient(#34a853, #0f9d58);
+        }
+
+        #export-code {
+            width: 96%;
+            background: #000;
+            color: #0f0;
+            border: 1px solid #0f0;
+            padding: 10px;
+            font-family: monospace;
+            font-size: 0.9em;
+            margin-top: 10px;
+            display: none;
+        }
+
+        .success-message {
+            color: #0f0;
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+            display: none;
+        }
+
+        .error-message {
+            color: #f00;
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
+            display: none;
+        }
+
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>La Harpe des Quatre Saisons</h1>
+
+    <!-- SECTION SYNCHRONISATION -->
+    <div class="section sync-section">
+        <h2>📱 Synchronisation Multi-Appareils</h2>
+        <p style="text-align: center; color: #aaa; font-size: 0.9em;">
+            Exporte tes données depuis un appareil et importe-les sur un autre
+        </p>
+        <div class="sync-buttons">
+            <button class="export-btn" onclick="exportData()">📤 Exporter mes données</button>
+            <button class="import-btn" onclick="importData()">📥 Importer des données</button>
+        </div>
+        <textarea id="export-code" readonly></textarea>
+        <div class="success-message" id="success-msg"></div>
+        <div class="error-message" id="error-msg"></div>
+    </div>
 
     <!-- SECTION STATS -->
     <div class="section">
@@ -270,11 +333,9 @@
     function rollDie(dieNumber) {
         const dieElement = document.getElementById('die' + dieNumber);
         
-        // Ajoute l'animation
         dieElement.classList.add('rolling');
         dieElement.innerText = '?';
 
-        // Attend 500ms puis affiche le résultat
         setTimeout(() => {
             const result = Math.floor(Math.random() * 6) + 1;
             dieElement.innerText = result;
@@ -282,7 +343,6 @@
         }, 500);
     }
 
-    // FONCTION POUR LANCER LES DEUX
     function rollBoth() {
         rollDie(1);
         rollDie(2);
@@ -319,6 +379,101 @@
             document.getElementById('save3').checked = data.save3 || false;
             document.getElementById('inventory').value = data.inventory || "";
         }
+    }
+
+    // EXPORT DES DONNEES
+    function exportData() {
+        const data = {
+            hpCurrent: document.getElementById('hp-current').value,
+            hpMax: document.getElementById('hp-max').value,
+            dexterity: document.getElementById('dexterity').value,
+            luck: document.getElementById('luck').value,
+            talent: document.getElementById('talent').value,
+            save1: document.getElementById('save1').checked,
+            save2: document.getElementById('save2').checked,
+            save3: document.getElementById('save3').checked,
+            inventory: document.getElementById('inventory').value
+        };
+
+        // Encoder en Base64 pour faciliter le copier-coller
+        const jsonString = JSON.stringify(data);
+        const encoded = btoa(encodeURIComponent(jsonString));
+        
+        // Afficher le code
+        const exportCode = document.getElementById('export-code');
+        exportCode.value = encoded;
+        exportCode.style.display = 'block';
+        
+        // Copier automatiquement dans le presse-papier
+        exportCode.select();
+        exportCode.setSelectionRange(0, 99999); // Pour mobile
+        
+        try {
+            navigator.clipboard.writeText(encoded);
+            showSuccess('✅ Code copié ! Colle-le sur ton autre appareil avec "Importer"');
+        } catch (err) {
+            showSuccess('✅ Code généré ! Sélectionne et copie le code ci-dessus');
+        }
+    }
+
+    // IMPORT DES DONNEES
+    function importData() {
+        const code = prompt('📥 Colle le code exporté depuis ton autre appareil :');
+        
+        if (!code) {
+            return; // Annulation
+        }
+
+        try {
+            // Décoder depuis Base64
+            const jsonString = decodeURIComponent(atob(code));
+            const data = JSON.parse(jsonString);
+            
+            // Appliquer les données
+            document.getElementById('hp-current').value = data.hpCurrent || 20;
+            document.getElementById('hp-max').value = data.hpMax || 20;
+            document.getElementById('dexterity').value = data.dexterity || 10;
+            document.getElementById('luck').value = data.luck || 10;
+            document.getElementById('talent').value = data.talent || "";
+            document.getElementById('save1').checked = data.save1 || false;
+            document.getElementById('save2').checked = data.save2 || false;
+            document.getElementById('save3').checked = data.save3 || false;
+            document.getElementById('inventory').value = data.inventory || "";
+            
+            // Sauvegarder localement
+            saveData();
+            
+            showSuccess('✅ Données importées avec succès !');
+        } catch (err) {
+            showError('❌ Code invalide. Vérifie que tu as copié le code complet.');
+        }
+    }
+
+    // AFFICHAGE DES MESSAGES
+    function showSuccess(message) {
+        const successMsg = document.getElementById('success-msg');
+        const errorMsg = document.getElementById('error-msg');
+        
+        errorMsg.style.display = 'none';
+        successMsg.textContent = message;
+        successMsg.style.display = 'block';
+        
+        setTimeout(() => {
+            successMsg.style.display = 'none';
+        }, 5000);
+    }
+
+    function showError(message) {
+        const successMsg = document.getElementById('success-msg');
+        const errorMsg = document.getElementById('error-msg');
+        
+        successMsg.style.display = 'none';
+        errorMsg.textContent = message;
+        errorMsg.style.display = 'block';
+        
+        setTimeout(() => {
+            errorMsg.style.display = 'none';
+        }, 5000);
     }
 
     // Charger les données dès que la page s'ouvre
